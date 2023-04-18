@@ -1,0 +1,80 @@
+networks:
+  postgresnet:
+    driver: bridge
+    ipam:
+      config:
+      - subnet: 10.0.0.0/24
+
+services:
+
+  postgres:
+    image: postgres:latest
+    container_name: postgres
+    hostname: postgres
+    environment:
+      POSTGRES_PASSWORD: 321
+      POSTGRES_USER: postgres
+      PGDATA: "/var/lib/postgresql/data/pgdata"
+    volumes:
+      - ./pgdata:/var/lib/postgresql/data/pgdata/    
+    ports:
+      - 5432:5432
+    restart: unless-stopped
+    networks:
+      postgresnet:
+        ipv4_address: 10.0.0.10
+ 
+  prometheus:
+    image: prom/prometheus:latest
+    volumes:
+      - ./prometheus/:/etc/prometheus/
+    container_name: prometheus
+    hostname: prometheus
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.retention.time=90d
+    ports:
+      - 9090:9090
+    restart: unless-stopped
+    networks:
+      postgresnet:
+        ipv4_address: 10.0.0.11
+
+  postgres_exporter:
+    container_name: pg_exporter
+    hostname: pg_exporter
+    image: prometheuscommunity/postgres-exporter:latest
+    environment:
+      DATA_SOURCE_URI: "postgres:5432/habrdb?sslmode=disable"
+      DATA_SOURCE_USER: "postgres"
+      DATA_SOURCE_PASS: "321"
+      PG_EXPORTER_EXTEND_QUERY_PATH: "/etc/postgres_exporter/queries.yaml"
+    volumes:
+      - ./postgres_exporter/queries.yaml:/etc/postgres_exporter/queries.yaml:ro
+    ports:
+      - 9187:9187
+    restart: unless-stopped
+    networks:
+      postgresnet:
+        ipv4_address: 10.0.0.12
+
+  grafana:
+    image: grafana/grafana
+    user: root
+    depends_on:
+      - prometheus
+    ports:
+      - 3000:3000
+    volumes:
+      - ./grafana:/var/lib/grafana
+      - ./grafana/provisioning/:/etc/grafana/provisioning/
+    container_name: grafana
+    hostname: grafana
+    restart: unless-stopped
+    networks:
+      postgresnet:
+        ipv4_address: 10.0.0.13
+
+  
+
+  
